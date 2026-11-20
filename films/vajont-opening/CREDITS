@@ -1,0 +1,61 @@
+THE DAM DIDN'T FAIL. THE MOUNTAIN DID. — Vajont, 1963 (documentary opening, 67.77 s)
+Credits, sources and reconstruction disclosures
+
+NARRATION
+  Voice: ElevenLabs synthetic voice, supplied by the user (NARRATION_ElevenLabs_67s.mp3), used whole and unedited.
+  Commercial use depends on the user's ElevenLabs plan: to be confirmed by the user.
+
+ARCHIVAL AND LATER PHOTOGRAPHS (supplied by the user; original host and licence NOT verified in production)
+  Shown in greyscale with one grade and grain; watermarks and printed captions left as they are.
+  S01  Valle_del_Vajont_1955.jpg ......................................... "PHOTO · 1955"
+  S01  Vista_della_gola_del_Vajont_prima_della_costruzione_della_diga.jpg . "PHOTO · before the dam"
+  S02  Edoardo_Semenza.jpg ............................................... "PHOTO · later"
+  S03  Diga_del_Vajont_vista_da_valle_(1960).jpg (mark: archivio Aime Simone)  "PHOTO · 1960"
+  S03  1957._Diga_del_Vajont._Stazione_mobile_del_Blondin_per_la_stesura_del_calcestruzzo.jpg (mark: ARCHIVIO AIME SIMONE)  "PHOTO · 1957"
+  S03/S15  Vajont_Dam_1960_panorama.jpg (postcard) ......................... "PHOTO · 1960"
+  S04  Carlo_Semenza.jpg ................................................. "PHOTO"
+  S04/S15  Diga_con_cabina_comandi.jpg ..................................... "PHOTO · the dam" / "PHOTO · detail"
+  S05/S07  Frana_Monte_Toc_1960_1.jpg ...................................... "PHOTO · 1960"
+  S05  Vajont_monte_toc_frana.jpg (modern colour photo, shown greyscale) .. "PHOTO · after 1963"
+  S06/S11/S16  Mappa_del_Vajont_1.jpg (photographed information panel; shown inverted) "MAP · retrospective"
+  S08  Diga_del_Vajont_1960.jpg, Vajont_Diga_1960.jpg (postcards) ......... "PHOTO · 1960"
+  S09/S16  Vajont_Dam_landslide.jpg ........................................ "PHOTO · after 1963"
+  S10  Vajont_Dam_1963.jpg ............................................... "PHOTO · after"
+  S12  Longarone_before_Vajont_dam_disaster.jpg (postcard) ................ "PHOTO · before"
+  S12  Disastro_del_Vajont,_9_ottobre_1963_(3).jpg ........................ "PHOTO · 1963"
+  S13  Campanile_Pirago.jpg .............................................. "PHOTO · Pirago, 1963"
+  S14/S16  Vajont_Dam_after_October_9_1963.jpg ............................. "PHOTO · after 9 Oct 1963"
+  S14  Vajont_Dam.jpg (modern colour photo, shown greyscale) .............. "PHOTO · now"
+  S15  Cartolina_Diga_del_Vajont.jpg (postcard) ........................... "POSTCARD"
+  S16  Disastro_del_Vajont,_9_ottobre_1963_(1).jpg ........................ "PHOTO · valley, 1963"
+  Supplied but not used in the cut: DisastroVajont1.jpg, Vajont1963_3.jpg.
+  Before publication: verify each photo's original source page and licence; the two ARCHIVIO AIME SIMONE images need a separate permission.
+
+AI RECONSTRUCTIONS (created by the user in Higgsfield; disclosed on screen with a dashed frame and a tag)
+  AI01_Geologist_1959.jpg ........ "AI RECONSTRUCTION" + "illustration · not a likeness of Edoardo Semenza" (S02)
+  AI02_Geology_Concept.jpg ....... "AI · CONCEPTUAL SCHEMATIC" — conceptual cross-section, not a measured geological section (S06, S07)
+  AI03_Landslide_Reconstruction.jpg  "AI RECONSTRUCTION" — not an authentic photograph of the event (S09, S10)
+  AI04_Wave_Reconstruction.jpg ... "AI · CONCEPTUAL SCHEMATIC" + "illustration · not a measured run-up" (S11, S12)
+  Code-drawn layers (red outlines, arrows, routes, wave front, slip surface, contour traces, arch plan, dots) are explanatory schematics.
+
+NOT IN THE FILM (reference only)
+  STYLE_REFERENCE_ONLY_DO_NOT_PUBLISH.mp4 — watched for style analysis only; no frame or sound used.
+  SIMULATION_REFERENCE_ONLY_DO_NOT_PUBLISH.mp4 (likely GiD Simulation, "3D numerical simulation of the Vajont disaster", 2021) — watched to
+  understand the direction of the slide and the wave; no frame used. Its motion was redrawn as schematic lines.
+
+MAP DATA
+  Natural Earth 1:50m coastline (public domain), naturalearthdata.com — coastline only, no borders.
+
+MUSIC AND SOUND
+  Original score written for this film, played with the Lemo-Opuscar sampler.
+  Samples (CC0): VS Chamber Orchestra: Community Edition (Versilian Studios), Versilian Community Sample Library (Versilian Studios).
+  Sound effects and room tone: synthesized in code (numpy), no recordings.
+
+TYPE
+  IBM Plex Sans, IBM Plex Mono — SIL Open Font License 1.1 (fonts/OFL.txt), © IBM Corp.
+
+TOOLS
+  Lemo-Opuscar (render, sampler, sound synthesis, mastering), headless Chromium, FFmpeg 9.0.2 (imageio-ffmpeg build) for encoding and loudness.
+  Word timings for synchronisation: NVIDIA Parakeet TDT 0.6B v2 (CC BY 4.0) via sherpa-onnx — analysis only, nothing of it is in the film.
+
+The user is responsible for the rights to the materials they supplied (photographs, AI images, narration) before any publication.

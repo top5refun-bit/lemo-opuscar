@@ -1,0 +1,142 @@
+{
+ "gorge55": {
+  "w": 1000,
+  "h": 1340,
+  "src": "S01_Summer_1959_Vajont_location/real/Valle_del_Vajont_1955.jpg"
+ },
+ "village": {
+  "w": 1709,
+  "h": 1128,
+  "src": "S01_Summer_1959_Vajont_location/real/Vista_della_gola_del_Vajont_prima_della_costruzione_della_diga.jpg"
+ },
+ "edo": {
+  "w": 800,
+  "h": 586,
+  "src": "S02_Edoardo_maps_the_mountain/real/Edoardo_Semenza.jpg"
+ },
+ "ai01": {
+  "w": 2400,
+  "h": 1340,
+  "src": "S02_Edoardo_maps_the_mountain/reconstruction/AI01_Geologist_1959.jpg"
+ },
+ "blondin57": {
+  "w": 1077,
+  "h": 770,
+  "src": "S03_Dam_almost_finished/real/1957._Diga_del_Vajont._Stazione_mobile_del_Blondin_per_la_stesura_del_calcestruzzo.jpg"
+ },
+ "dam60v": {
+  "w": 1058,
+  "h": 1482,
+  "src": "S03_Dam_almost_finished/real/Diga_del_Vajont_vista_da_valle_(1960).jpg"
+ },
+ "pano60": {
+  "w": 800,
+  "h": 549,
+  "src": "S03_Dam_almost_finished/real/Vajont_Dam_1960_panorama.jpg"
+ },
+ "carlo": {
+  "w": 530,
+  "h": 507,
+  "src": "S04_Carlo_father_and_engineer/real/Carlo_Semenza.jpg"
+ },
+ "cabin": {
+  "w": 2400,
+  "h": 1707,
+  "src": "S04_Carlo_father_and_engineer/real/Diga_con_cabina_comandi.jpg"
+ },
+ "crack60": {
+  "w": 433,
+  "h": 291,
+  "src": "S05_Mountain_not_solid/real/Frana_Monte_Toc_1960_1.jpg"
+ },
+ "toc": {
+  "w": 2288,
+  "h": 1712,
+  "src": "S05_Mountain_not_solid/real/Vajont_monte_toc_frana.jpg"
+ },
+ "map": {
+  "w": 2004,
+  "h": 1339,
+  "src": "S06_Prehistoric_scar/real/Mappa_del_Vajont_1.jpg"
+ },
+ "ai02": {
+  "w": 2400,
+  "h": 1340,
+  "src": "S06_Prehistoric_scar/reconstruction/AI02_Geology_Concept.jpg"
+ },
+ "lake60a": {
+  "w": 800,
+  "h": 552,
+  "src": "S08_9_October_1963/real/Diga_del_Vajont_1960.jpg"
+ },
+ "lake60b": {
+  "w": 800,
+  "h": 559,
+  "src": "S08_9_October_1963/real/Vajont_Diga_1960.jpg"
+ },
+ "slide63": {
+  "w": 800,
+  "h": 550,
+  "src": "S09_260_million_cubic_metres/real/Vajont_Dam_landslide.jpg"
+ },
+ "ai03": {
+  "w": 2400,
+  "h": 1340,
+  "src": "S09_260_million_cubic_metres/reconstruction/AI03_Landslide_Reconstruction.jpg"
+ },
+ "dam63": {
+  "w": 800,
+  "h": 558,
+  "src": "S10_Slide_enters_reservoir/real/Vajont_Dam_1963.jpg"
+ },
+ "ai04": {
+  "w": 2400,
+  "h": 1340,
+  "src": "S11_Wave_rushes_across_lake/reconstruction/AI04_Wave_Reconstruction.jpg"
+ },
+ "longB": {
+  "w": 800,
+  "h": 558,
+  "src": "S12_Overtopping_and_Longarone/real/Longarone_before_Vajont_dam_disaster.jpg"
+ },
+ "longA": {
+  "w": 900,
+  "h": 660,
+  "src": "S12_Overtopping_and_Longarone/real/Disastro_del_Vajont,_9_ottobre_1963_(3).jpg"
+ },
+ "pirago": {
+  "w": 540,
+  "h": 543,
+  "src": "S13_Nearly_two_thousand_victims/real/Campanile_Pirago.jpg"
+ },
+ "dis1": {
+  "w": 585,
+  "h": 440,
+  "src": "S13_Nearly_two_thousand_victims/real/DisastroVajont1.jpg"
+ },
+ "v1963_3": {
+  "w": 890,
+  "h": 660,
+  "src": "S13_Nearly_two_thousand_victims/real/Vajont1963_3.jpg"
+ },
+ "cartolina": {
+  "w": 546,
+  "h": 800,
+  "src": "S14_Dam_survived/real/Cartolina_Diga_del_Vajont.jpg"
+ },
+ "damModern": {
+  "w": 480,
+  "h": 720,
+  "src": "S14_Dam_survived/real/Vajont_Dam.jpg"
+ },
+ "damAfter": {
+  "w": 893,
+  "h": 660,
+  "src": "S14_Dam_survived/real/Vajont_Dam_after_October_9_1963.jpg"
+ },
+ "aerial63": {
+  "w": 898,
+  "h": 660,
+  "src": "S16_The_fatal_paradox/real/Disastro_del_Vajont,_9_ottobre_1963_(1).jpg"
+ }
+}

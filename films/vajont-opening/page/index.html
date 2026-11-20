@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>The Dam Didn't Fail. The Mountain Did.</title>
+<style>
+@font-face{font-family:PlexSans;src:url(fonts/IBMPlexSans-VF.ttf) format('truetype');font-weight:100 700}
+@font-face{font-family:PlexMono;src:url(fonts/IBMPlexMono-Regular.ttf) format('truetype');font-weight:400}
+@font-face{font-family:PlexMono;src:url(fonts/IBMPlexMono-SemiBold.ttf) format('truetype');font-weight:600}
+@font-face{font-family:PlexMono;src:url(fonts/IBMPlexMono-Bold.ttf) format('truetype');font-weight:700}
+html,body{margin:0;background:#0B0C0E;overflow:hidden}canvas{display:block}
+</style></head><body><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// ───────── VAJONT — "The Dam Didn't Fail. The Mountain Did." · Visual Investigation ─────────
+// One Canvas-2D page drawn deterministically by window.render(t). Timings: film.json (sections, subtitles).
+// Sound cues are recorded from the same calls that draw the picture (cue()), so picture and sound share one clock.
+const W = 1920, H = 1080, FPS = 30;
+const cv = document.getElementById('c'), x = cv.getContext('2d');
+const C = { bg:'#0B0C0E', panel:'#141619', line:'#2E3238', text:'#ECEAE4', dim:'#8B9097', faint:'#4A4F57', acc:'#FF4A2E', paper:'#E4E0D4' };
+const F = { sans:'PlexSans', mono:'PlexMono' };
+let FILM = null, SECS = [], FR = 0, REC = null, CUES = null;
+
+// ── utilities ──
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const eo = k => 1 - Math.pow(1 - k, 3), eio = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const lerp = (a, b, k) => a + (b - a) * k;
+function rnd(s) { return function () { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+// sound cue registry: filled during the events pass (window.EV getter); every cue sits on the time that also drives the picture
+function cue(type, at, o = {}) { if (CUES) { const k = type + '@' + at.toFixed(3); if (!CUES.has(k)) CUES.set(k, Object.assign({ t: +at.toFixed(3), type }, o)); } }
+const on = (t, at, d = .04) => seg(t, at, at + d);                       // cut in (≤ 0.1 s)
+function fl(t, at, type = 'shutter', o) { if (t >= at) cue(type, at, o); return t >= at ? 1 - seg(t, at, at + .1) : 0; } // 3-frame white flash
+function dk(t, a, b, type = 'pencil', o) { if (t >= a) cue(type, a, Object.assign({ d: b - a }, o)); return eo(seg(t, a, b)); } // drawn stroke progress
+
+// ── assets ──
+const IM = {}; let GRAIN = [], COAST = [];
+const KEYS = ['gorge55','village','edo','ai01','blondin57','dam60v','pano60','carlo','cabin','crack60','toc','map','ai02','lake60a','lake60b','slide63','ai03','dam63','ai04','longB','longA','pirago','dis1','v1963_3','cartolina','damModern','damAfter','aerial63'];
+function load(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => { console.warn('missing', src); r(null); }; i.src = src; }); }
+async function boot() {
+  FILM = await (await fetch('film.json')).json(); SECS = FILM.sections; window.DUR = FILM.frames / FILM.fps;
+  COAST = await (await fetch('assets/coast.json')).json();
+  const L = KEYS.map(k => load(`assets/${k}.jpg`).then(i => IM[k] = i));
+  for (const f of ['700 40px PlexSans', '500 20px PlexSans', '400 20px PlexMono', '600 20px PlexMono', '700 20px PlexMono']) L.push(document.fonts.load(f));
+  await Promise.all(L);
+  for (const k of KEYS) if (!IM[k]) throw new Error('missing image ' + k);
+  GRAIN = []; for (let g = 0; g < 6; g++) { const c = document.createElement('canvas'); c.width = c.height = 256; const gx = c.getContext('2d'); const d = gx.createImageData(256, 256); const r = rnd(g * 99 + 7);
+    for (let i = 0; i < d.data.length; i += 4) { const v = 128 + (r() + r() + r() - 1.5) * 120; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } gx.putImageData(d, 0, 0); GRAIN.push(c); }
+  window.READY = true;
+}
+
+// ── drawing primitives ──
+function txt(s, X, Y, o = {}) {
+  x.save(); x.font = `${o.w || 400} ${o.s || 24}px ${o.f || F.sans}`; x.fillStyle = o.c || C.text; x.globalAlpha *= (o.a ?? 1);
+  x.textAlign = o.al || 'left'; x.textBaseline = 'alphabetic'; x.letterSpacing = (o.ls || 0) + 'px';
+  const ga = x.globalAlpha; if (ga > 0.001) x.fillText(s, X, Y);
+  const w = x.measureText(s).width; x.restore();
+  if (REC && o.id && ga > 0.5) { const sz = o.s || 24, x0 = o.al === 'right' ? X - w : o.al === 'center' ? X - w / 2 : X;
+    REC.push({ id: o.id, text: s, x0, y0: Y - sz * .8, x1: x0 + w, y1: Y + sz * .22 }); }
+  return w;
+}
+function tw(s, o = {}) { x.save(); x.font = `${o.w || 400} ${o.s || 24}px ${o.f || F.sans}`; x.letterSpacing = (o.ls || 0) + 'px'; const w = x.measureText(s).width; x.restore(); return w; }
+function hair(x0, y0, x1, y1, c = C.line, w = 1, dash) { x.save(); x.strokeStyle = c; x.lineWidth = w; if (dash) x.setLineDash(dash); x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); x.restore(); }
+function rect(X, Y, w, h, c = C.line, lw = 1, dash) { x.save(); x.strokeStyle = c; x.lineWidth = lw; if (dash) x.setLineDash(dash); x.strokeRect(X + .5, Y + .5, w - 1, h - 1); x.restore(); }
+function fill(X, Y, w, h, c) { x.fillStyle = c; x.fillRect(X, Y, w, h); }
+function clipR(P) { x.beginPath(); x.rect(P.X, P.Y, P.w, P.h); x.clip(); }
+// one grade for every source: photos greyscale/contrast; AI stills a touch softer; maps and the geology concept inverted into dark line drawings
+function plate(img, sx, sy, sw, sh, X, Y, w, h, o = {}) {
+  x.save(); x.globalAlpha *= (o.a ?? 1); fill(X, Y, w, h, '#000');
+  x.filter = o.inv ? 'grayscale(1) invert(1) brightness(0.62) contrast(1.3)' : o.soft ? 'grayscale(1) contrast(1.05) brightness(0.78)' : o.ai ? 'grayscale(1) contrast(1.12) brightness(0.9)' : 'grayscale(1) contrast(1.22) brightness(0.94)';
+  x.imageSmoothingQuality = 'high'; x.drawImage(img, sx, sy, sw, sh, X, Y, w, h); x.filter = 'none';
+  if (GRAIN.length && !o.inv) { x.beginPath(); x.rect(X, Y, w, h); x.clip(); x.globalCompositeOperation = 'overlay'; x.globalAlpha *= .22;
+    const g = GRAIN[FR % 6]; for (let gy = Y; gy < Y + h; gy += 256) for (let gx = X; gx < X + w; gx += 256) x.drawImage(g, gx, gy); }
+  x.restore();
+  if (o.flash > 0) { x.save(); x.globalAlpha = o.flash * (o.a ?? 1); fill(X, Y, w, h, '#fff'); x.restore(); }
+  if (o.dashed) rect(X, Y, w, h, C.dim, 1.5, [9, 6]); else if (!o.noborder) rect(X, Y, w, h, C.line, 1);
+}
+// fill a panel without stretching; z = push inside the picture (camera never moves), fx/fy = focal point (fraction of the source)
+function view(img, X, Y, w, h, o = {}) {
+  const iw = img.width, ih = img.height; let sw = iw, sh = iw * h / w; if (sh > ih) { sh = ih; sw = ih * w / h; }
+  const z = o.z || 1; sw /= z; sh /= z; const fx = o.fx ?? .5, fy = o.fy ?? .5;
+  const sx = clamp(fx * iw - sw / 2, 0, iw - sw), sy = clamp(fy * ih - sh / 2, 0, ih - sh);
+  plate(img, sx, sy, sw, sh, X, Y, w, h, o); const k = w / sw;
+  const mp = (px, py) => [X + (px - sx) * k, Y + (py - sy) * k]; mp.k = k; return mp;
+}
+function tag(s, X, Y, o = {}) { // source tag: chip + short mono text, just above its frame
+  x.save(); x.globalAlpha *= o.a ?? 1; fill(X, Y - 11, 6, 12, o.chip || C.text); x.restore();
+  return txt(s, X + 14, Y, { s: o.s || 16, f: F.mono, c: o.c || C.text, w: 600, ls: 1, a: o.a ?? 1, id: o.id });
+}
+function chip(s, X, Y, o = {}) { // dark label box so a label stays legible on a bright photo
+  const sz = o.s || 22, w = tw(s, { s: sz, w: o.w || 700, f: o.f, ls: o.ls }), al = o.al || 'left', x0 = al === 'right' ? X - w : al === 'center' ? X - w / 2 : X;
+  x.save(); x.globalAlpha *= o.a ?? 1; fill(x0 - 10, Y - sz * .95, w + 20, sz * 1.35, 'rgba(11,12,14,0.86)'); x.restore();
+  txt(s, X, Y, { s: sz, w: o.w || 700, f: o.f, c: o.c, al, a: o.a ?? 1, id: o.id, ls: o.ls });
+}
+function polyK(P, k, o = {}) { // progressive stroke along a polyline
+  if (k <= 0 || P.length < 2) return null; const L = [0]; for (let i = 1; i < P.length; i++) L.push(L[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+  const tot = L[L.length - 1] * clamp(k); x.save(); x.strokeStyle = o.c || C.acc; x.lineWidth = o.w || 2.5; x.lineJoin = 'round'; x.lineCap = 'round'; x.globalAlpha *= o.a ?? 1;
+  if (o.dash) { x.setLineDash(o.dash); x.lineDashOffset = o.off || 0; }
+  x.beginPath(); x.moveTo(P[0][0], P[0][1]); let end = P[0], ang = 0;
+  for (let i = 1; i < P.length; i++) { ang = Math.atan2(P[i][1] - P[i - 1][1], P[i][0] - P[i - 1][0]);
+    if (L[i] <= tot) { x.lineTo(P[i][0], P[i][1]); end = P[i]; } else { const f = (tot - L[i - 1]) / (L[i] - L[i - 1]); end = [lerp(P[i - 1][0], P[i][0], f), lerp(P[i - 1][1], P[i][1], f)]; x.lineTo(end[0], end[1]); break; } }
+  x.stroke(); x.restore();
+  if (o.head && k > .04) { const hs = o.hs || 16; x.save(); x.globalAlpha *= o.a ?? 1; x.fillStyle = o.c || C.acc; x.translate(end[0], end[1]); x.rotate(ang); x.beginPath(); x.moveTo(4, 0); x.lineTo(-hs, -hs * .55); x.lineTo(-hs, hs * .55); x.closePath(); x.fill(); x.restore(); }
+  return end;
+}
+function polyFill(P, c) { x.save(); x.fillStyle = c; x.beginPath(); P.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.closePath(); x.fill(); x.restore(); }
+const closeP = P => P.concat([P[0]]);
+// ring callout: thin red circle drawn clockwise (0.5 s ease-out); at 60 % a leader and a label come out
+function ring(cx, cy, r, k, label, side = 1, id, up = 1) {
+  if (k <= 0) return; x.save(); x.strokeStyle = C.acc; x.lineWidth = 2.5; x.beginPath(); x.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * eo(k)); x.stroke(); x.restore();
+  if (label && k > .6) { const a = seg(k, .6, .75); const lx = cx + side * r * .72, ly = cy - up * r * .72, ex = lx + side * 40, ey = ly - up * 30;
+    x.save(); x.globalAlpha *= a; hair(lx, ly, ex, ey, C.acc, 1.5); hair(ex, ey, ex + side * 14, ey, C.acc, 1.5); x.restore();
+    chip(label, ex + side * 24, ey + 8, { s: 22, al: side > 0 ? 'left' : 'right', a, id }); }
+}
+function badge(X, Y, t, at, bad) { // ✓ (or ✗) in a red box; no words
+  if (t >= at) cue('mallet', at, { n: bad ? 0 : 1 }); const k = seg(t, at, at + .06); if (k <= 0) return;
+  x.save(); x.globalAlpha *= k; const s = 1 + .3 * (1 - seg(t, at, at + .18)); x.translate(X, Y); x.scale(s, s);
+  x.fillStyle = 'rgba(11,12,14,0.9)'; x.fillRect(-17, -17, 34, 34); x.strokeStyle = C.acc; x.lineWidth = 2; x.strokeRect(-17, -17, 34, 34); x.lineWidth = 3.2; x.lineCap = 'round'; x.beginPath();
+  if (bad) { x.moveTo(-8, -8); x.lineTo(8, 8); x.moveTo(8, -8); x.lineTo(-8, 8); } else { x.moveTo(-9, 0); x.lineTo(-2, 8); x.lineTo(10, -8); }
+  x.stroke(); x.restore();
+}
+function flashRect(X, Y, w, h, k) { if (k <= 0) return; x.save(); x.globalAlpha = k; fill(X, Y, w, h, '#fff'); x.restore(); }
+function lower(X, Y, title, sub, k, id) { if (k <= 0) return; x.save(); x.globalAlpha *= k; fill(X, Y, 6, 74, C.acc); x.restore();
+  txt(title, X + 24, Y + 36, { s: 36, w: 700, a: k, id }); if (sub) txt(sub, X + 26, Y + 66, { s: 17, f: F.mono, c: C.dim, ls: 2, a: k }); }
+function count(t, a, b, v0, v1) { const k = eo(seg(t, a, b)); if (t >= a && t < b) for (let s = a; s < b; s += .1) cue('tick', +s.toFixed(2), { v: .35 }); return Math.round(lerp(v0, v1, k)); }
+
+// ── geography: Natural Earth 1:50m coastline, no borders; the valley map is the user's photographed information panel ──
+const VAJ = [12.33, 46.27], VEN = [12.33, 45.44];
+function locator(t, M, o) {
+  fill(M.X, M.Y, M.w, M.h, C.panel); x.save(); clipR(M);
+  const sc = o.sc, cx = M.X + M.w * (o.cx ?? .5), cy = M.Y + M.h * (o.cy ?? .5), c0 = o.c0;
+  const base = (lon, lat) => [cx + (lon - c0[0]) * sc * Math.cos(45.5 * Math.PI / 180), cy - (lat - c0[1]) * sc];
+  const pin = base(...VAJ), z = o.z || 1, prj = (lon, lat) => { const p = base(lon, lat); return [pin[0] + (p[0] - pin[0]) * z, pin[1] + (p[1] - pin[1]) * z]; };
+  for (let g = Math.floor(c0[1]) - 6; g <= c0[1] + 6; g++) { const a = prj(c0[0] - 12, g), b = prj(c0[0] + 12, g); hair(a[0], a[1], b[0], b[1], 'rgba(255,255,255,0.035)'); }
+  for (let g = Math.floor(c0[0]) - 9; g <= c0[0] + 9; g++) { const a = prj(g, c0[1] - 8), b = prj(g, c0[1] + 8); hair(a[0], a[1], b[0], b[1], 'rgba(255,255,255,0.035)'); }
+  const k = o.k ?? 1; for (const ln of COAST) polyK(ln.map(p => prj(p[0], p[1])), k, { c: C.dim, w: 1.4 });
+  if (k > .7) { const a = seg(k, .7, 1); const v = prj(...VEN); x.save(); x.globalAlpha = a; x.fillStyle = C.dim; x.fillRect(v[0] - 3, v[1] - 3, 6, 6); x.restore();
+    txt('Venice', v[0] + 10, v[1] + 18, { s: o.small ? 13 : 16, f: F.mono, c: C.dim, a });
+    if (!o.small) { const s = prj(13.6, 44.25); txt('ADRIATIC SEA', s[0], s[1], { s: 15, f: F.mono, c: C.faint, ls: 3, a });
+      const al = prj(10.2, 46.75); txt('A L P S', al[0], al[1], { s: 18, f: F.mono, c: C.faint, ls: 4, a }); } }
+  const pk = o.pk ?? 1, pp = prj(...VAJ);
+  if (pk > 0) { x.save(); x.globalAlpha = seg(pk, 0, .2); x.fillStyle = C.acc; x.beginPath(); x.arc(pp[0], pp[1], o.small ? 5 : 7, 0, 7); x.fill(); x.restore(); ring(pp[0], pp[1], o.small ? 18 : 30, pk); }
+  if (o.label && pk > .6) chip(o.label, pp[0] + (o.small ? 26 : 42), pp[1] + 8, { s: o.small ? 20 : 26, a: seg(pk, .6, .8), id: o.lid });
+  if (!o.small) { const km = 50, px = km / 111 * sc * z; hair(M.X + 30, M.Y + M.h - 30, M.X + 30 + px, M.Y + M.h - 30, C.dim, 2); txt(km + ' km', M.X + 40 + px, M.Y + M.h - 24, { s: 14, f: F.mono, c: C.dim }); }
+  x.restore(); rect(M.X, M.Y, M.w, M.h);
+}
+// valley map (source px of map.jpg, 2004×1339): slide area as drawn on the panel ("Frana"), dam (725), towns
+const MAP = {
+  slide: [[930,616],[1002,587],[1088,573],[1145,558],[1217,601],[1288,630],[1345,658],[1338,773],[1324,859],[1260,902],[1145,895],[1031,873],[945,830],[923,744]],
+  dam: [930, 673], longarone: [472, 575], casso: [960, 494], erto: [1640, 360], slideC: [1135, 735],
+  west: [[1060,712],[990,688],[930,673],[860,656],[790,642],[700,628],[620,612]],
+  north: [[1060,640],[1030,570],[985,505]],
+  east: [[1330,700],[1450,650],[1580,575],[1700,480]],
+  toLong: [[620,612],[560,596],[490,580]] };
+
+// ═════════ scenes (content y 60–900; subtitles below) ═════════
+function s01(t) { // 0.00–3.20 SUMMER 1959 · where
+  const P = { X: 60, Y: 92, w: 600, h: 804 };
+  view(IM.gorge55, P.X, P.Y, P.w, P.h, { z: lerp(1, 1.04, seg(t, 0, 3.2)), fx: .5, fy: .42, flash: fl(t, 0) });
+  tag('PHOTO · 1955', P.X, 78, { id: 't01a' });
+  if (t >= .4) { cue('click', .4); txt('SUMMER', 724, 196, { s: 58, w: 700, c: C.dim, ls: 6, a: on(t, .4), id: 'r01a' }); }
+  if (t >= .9) { cue('click', .9, { v: 1.2 }); txt('1959', 714, 384, { s: 200, w: 700, a: on(t, .9), id: 'r01b' }); flashRect(714, 210, 470, 190, (1 - seg(t, .9, 1.0)) * .8); }
+  if (t >= .6) { const M = { X: 1240, Y: 92, w: 620, h: 560 }; cue('paper', .6);
+    locator(t, M, { sc: 100, c0: [11.9, 45.4], z: lerp(1, 1.55, eio(seg(t, 1.2, 3.2))), k: dk(t, .6, 1.25, 'none'), pk: seg(t, 1.1, 1.6) });
+    flashRect(M.X, M.Y, M.w, M.h, 1 - seg(t, .6, .7)); tag('MAP · coastline', M.X, 78); if (t >= 1.1) cue('pencil', 1.1, { d: .5 }); }
+  if (t >= 1.75) { const V = { X: 724, Y: 556, w: 470, h: 310 }; view(IM.village, V.X, V.Y, V.w, V.h, { fy: .55, flash: fl(t, 1.75) }); tag('PHOTO · before the dam', V.X, V.Y - 14); }
+  if (t >= .85) { cue('click', .85, { v: .6 }); lower(1240, 720, 'VAJONT VALLEY', '46.27° N · 12.33° E', on(t, .85), 'lt01'); }
+}
+function s02(t) { // 3.20–7.90 the son, mapping the slopes
+  const P = { X: 60, Y: 92, w: 1290, h: 720 };
+  const mp = view(IM.ai01, P.X, P.Y, P.w, P.h, { ai: 1, dashed: 1, z: lerp(1, 1.05, seg(t, 3.2, 7.9)), fx: .6, fy: .4, flash: fl(t, 3.2) });
+  tag('AI RECONSTRUCTION', P.X, 78, { id: 'ai01tag', chip: C.dim });
+  txt('illustration · not a likeness of Edoardo Semenza', P.X, P.Y + P.h + 30, { s: 16, f: F.mono, c: C.dim, a: on(t, 3.3) });
+  const L = [[[1060,330],[1300,300],[1600,268],[1900,248],[2180,262]], [[1000,430],[1300,402],[1600,376],[1860,356],[2100,350]], [[1060,540],[1340,494],[1640,446],[1880,420]]];
+  x.save(); clipR(P); L.forEach((ln, i) => polyK(ln.map(p => mp(...p)), dk(t, 5.05 + i * .28, 5.85 + i * .28), { w: 2.2 })); x.restore();
+  if (t >= 5.8) { const e = mp(2180, 262); chip('strata · traced', e[0] - 20, e[1] - 24, { s: 16, f: F.mono, w: 600, al: 'right', a: on(t, 5.8, .1) }); }
+  if (t >= 3.5) { const E = { X: 1400, Y: 92, w: 460, h: 337 }; const me = view(IM.edo, E.X, E.Y, E.w, E.h, { flash: fl(t, 3.5) }); tag('PHOTO · later', E.X, 78, { id: 't02b' });
+    const [rx, ry] = me(368, 230); x.save(); clipR(E); ring(rx, ry, 70, dk(t, 3.75, 4.25)); x.restore();
+    txt('EDOARDO SEMENZA', E.X, 488, { s: 38, w: 700, a: on(t, 3.6), id: 'n02' }); txt('GEOLOGIST', E.X + 2, 520, { s: 17, f: F.mono, c: C.dim, ls: 3, a: on(t, 3.7) }); }
+  if (t >= 5.25) { const M = { X: 1400, Y: 600, w: 460, h: 212 }; cue('paper', 5.25);
+    locator(t, M, { sc: 64, c0: [12.1, 45.9], cy: .55, z: 1, k: 1, pk: seg(t, 5.3, 5.7), label: 'ITALIAN ALPS', lid: 'm02', small: 1 }); flashRect(M.X, M.Y, M.w, M.h, 1 - seg(t, 5.25, 5.35)); tag('MAP', M.X, M.Y - 14); }
+}
+function s03(t) { // 7.90–12.00 the dam, measured
+  const P = { X: 60, Y: 92, w: 575, h: 805 };
+  const mp = view(IM.dam60v, P.X, P.Y, P.w, P.h, { z: lerp(1, 1.03, seg(t, 7.9, 12)), fx: .5, fy: .5, flash: fl(t, 7.9) }); tag('PHOTO · 1960', P.X, 78, { id: 't03a' });
+  const top = mp(470, 158)[1], bot = mp(470, 1400)[1], lx = P.X + P.w + 40, k = dk(t, 8.35, 9.2);
+  if (k > 0) { hair(lx, bot, lx, lerp(bot, top, k), C.acc, 2.5); hair(lx - 9, bot, lx + 9, bot, C.acc, 2.5);
+    if (k >= 1) { hair(lx - 9, top, lx + 9, top, C.acc, 2.5); x.save(); x.globalAlpha = .7; hair(mp(470, 0)[0], top, lx, top, C.acc, 1, [3, 5]); hair(mp(470, 0)[0], bot, lx, bot, C.acc, 1, [3, 5]); x.restore(); } }
+  if (t >= 9.2) { const v = count(t, 9.2, 9.75, 0, 2616); txt((v / 10).toFixed(1) + ' m', 744, 300, { s: 120, w: 700, a: on(t, 9.2), id: t >= 9.75 ? 'r03' : null });
+    txt('STRUCTURAL HEIGHT', 750, 346, { s: 18, f: F.mono, c: C.dim, ls: 3, a: on(t, 9.3) }); }
+  if (t >= 9.6) { // construction clock: years, playhead on the story's summer 1959
+    const X0 = 1340, X1 = 1840, Y = 230, yr = y => lerp(X0, X1, (y - 1957) / 3); cue('click', 9.6, { v: .5 });
+    txt('CONSTRUCTION', X0, 150, { s: 18, f: F.mono, c: C.dim, ls: 3, a: on(t, 9.6), id: 'c03' });
+    hair(X0, Y, X1, Y, C.line, 2); [1957, 1958, 1959, 1960].forEach(y => { hair(yr(y), Y - 8, yr(y), Y + 8, C.dim); txt(String(y), yr(y), Y + 34, { s: 16, f: F.mono, c: C.dim, al: 'center' }); });
+    const ph = lerp(1957, 1959.55, eio(seg(t, 9.7, 11.3))); fill(X0, Y - 3, yr(ph) - X0, 6, 'rgba(236,234,228,0.55)'); hair(yr(ph), Y - 26, yr(ph), Y + 12, C.acc, 2.5);
+    if (t > 11.4) txt('SUMMER 1959', yr(ph), Y - 36, { s: 16, f: F.mono, w: 600, c: C.acc, al: 'center', a: on(t, 11.4, .1) }); }
+  if (t >= 10.05) { const B = { X: 744, Y: 470, w: 520, h: 372 }; view(IM.blondin57, B.X, B.Y, B.w, B.h, { flash: fl(t, 10.05) }); tag('PHOTO · 1957', B.X, B.Y - 14); }
+  if (t >= 10.75) { const Q = { X: 1300, Y: 470, w: 560, h: 384 }; const mq = view(IM.pano60, Q.X, Q.Y, Q.w, Q.h, { flash: fl(t, 10.75) }); tag('PHOTO · 1960', Q.X, Q.Y - 14);
+    const [cx, cy] = mq(470, 325); x.save(); clipR(Q); ring(cx, cy, 120, dk(t, 11.3, 11.8)); x.restore(); }
+}
+function s04(t) { // 12.00–15.30 father and son
+  const E = { X: 60, Y: 300, w: 400, h: 293 };
+  const me = view(IM.edo, E.X, E.Y, E.w, E.h, { flash: fl(t, 12.0, 'click') }); tag('PHOTO · later', E.X, E.Y - 14);
+  txt('EDOARDO SEMENZA', E.X, E.Y + E.h + 40, { s: 28, w: 700, id: 'n04a' }); txt('SON', E.X, E.Y + E.h + 76, { s: 24, w: 700, c: C.dim, id: 'l04a' });
+  if (t >= 12.3) { const P = { X: 600, Y: 92, w: 560, h: 536 }; const mc = view(IM.carlo, P.X, P.Y, P.w, P.h, { flash: fl(t, 12.3) }); tag('PHOTO', P.X, 78);
+    const [rx, ry] = mc(288, 205); x.save(); clipR(P); ring(rx, ry, 150, dk(t, 12.55, 13.05)); x.restore();
+    txt('CARLO SEMENZA', P.X, 690, { s: 46, w: 700, a: on(t, 12.35), id: 'n04b' }); txt('FATHER', P.X, 732, { s: 24, w: 700, c: C.dim, a: on(t, 12.45), id: 'l04b' }); txt('DESIGNED THE DAM', P.X + tw('FATHER  ', { s: 24, w: 700 }), 732, { s: 17, f: F.mono, c: C.dim, ls: 2, a: on(t, 12.45), id: 'n04c' }); }
+  if (t >= 13.1) { const Q = { X: 1280, Y: 92, w: 580, h: 412 }; const mq = view(IM.cabin, Q.X, Q.Y, Q.w, Q.h, { flash: fl(t, 13.1) }); tag('PHOTO · the dam', Q.X, 78);
+    const [cx, cy] = mq(1640, 860); x.save(); clipR(Q); ring(cx, cy, 150, dk(t, 13.45, 13.95)); x.restore();
+    const k = dk(t, 13.2, 13.6, 'none'); hair(1160, 300, lerp(1160, 1280, k), 300, C.dim, 1.5); if (k >= 1) txt('DESIGNED', 1220, 288, { s: 14, f: F.mono, c: C.dim, al: 'center' }); }
+  const kl = dk(t, 14.4, 14.85); // the link: father ↔ son
+  if (kl > 0) { const ax = E.X + E.w, ay = E.Y + E.h / 2, bx = 600, by = 446; polyK([[ax, ay], [530, ay], [530, by], [bx, by]], kl, { w: 2.5 });
+    if (kl >= 1) { badgeDot(ax, ay); badgeDot(bx, by); } }
+}
+function badgeDot(X, Y) { x.save(); x.fillStyle = C.acc; x.beginPath(); x.arc(X, Y, 5, 0, 7); x.fill(); x.restore(); }
+const TOC = [[0,600],[120,560],[280,520],[330,610],[420,700],[470,830],[560,780],[700,700],[900,650],[1150,575],[1450,590],[1700,605],[1950,565],[2288,560],[2288,1150],[1900,1170],[1500,1170],[1150,1190],[800,1180],[500,1120],[250,1040],[0,960]];
+function s05(t) { // 15.30–21.30 the mountainside is not solid
+  const P = { X: 60, Y: 92, w: 1100, h: 804 };
+  const mp = view(IM.toc, P.X, P.Y, P.w, P.h, { z: lerp(1, 1.06, eio(seg(t, 15.3, 21.3))), fx: .5, fy: .52, flash: fl(t, 15.3) }); tag('PHOTO · after 1963', P.X, 78, { id: 't05a' });
+  x.save(); clipR(P);
+  const S = closeP(TOC).map(p => mp(...p)); const ko = dk(t, 16.5, 17.9);
+  if (t >= 18.6) polyFill(S, `rgba(255,74,46,${.12 * seg(t, 18.6, 19.0)})`);
+  polyK(S, ko, { w: 2.6, dash: [12, 8] });
+  if (t >= 15.85) { const [sx, sy] = mp(1000, 190); chip('MONTE TOC', sx, sy + 70, { s: 24, al: 'center', a: on(t, 15.85, .1), id: 'c05a' }); cue('click', 15.85, { v: .5 }); }
+  if (t >= 18.7) { const [lx, ly] = mp(1500, 900); chip('ENTIRE FLANK ≈', lx, ly, { s: 26, al: 'center', a: on(t, 18.7, .1), id: 'c05b' }); cue('click', 18.7, { v: .6 }); }
+  x.restore();
+  lower(1200, 720, 'MONTE TOC', 'SOUTH SIDE OF THE VAJONT VALLEY', on(t, 16.0), 'lt05');
+  if (t >= 19.1) { const Q = { X: 1200, Y: 92, w: 660, h: 444 }; const mq = view(IM.crack60, Q.X, Q.Y, Q.w, Q.h, { flash: fl(t, 19.1) }); tag('PHOTO · 1960', Q.X, 78, { id: 't05b' });
+    const [cx, cy] = mq(228, 138); x.save(); clipR(Q); polyK([[110,160],[164,137],[209,130],[242,124],[268,133],[307,140],[346,146]].map(p => mq(...p)), dk(t, 19.2, 19.65), { w: 2, a: .9 }); x.restore();
+    ring(cx, cy, 150, dk(t, 19.15, 19.65, 'none'), 'CRACK', -1, 'c05c');
+    txt('photographed 1960 · after the 1959 survey', Q.X, Q.Y + Q.h + 32, { s: 16, f: F.mono, c: C.dim, a: on(t, 19.2) }); }
+}
+const AI02 = { slip: [[2120,430],[2060,560],[1990,690],[1880,800],[1720,905],[1520,975],[1300,1015],[1100,1040],[930,1050]],
+  block: [[930,1050],[1000,975],[1150,890],[1350,785],[1550,680],[1750,565],[1900,478],[2050,415],[2120,430],[2060,560],[1990,690],[1880,800],[1720,905],[1520,975],[1300,1015],[1100,1040]] };
+function s06(t) { // 21.30–24.80 the scar, in plan and in section
+  const M = { X: 60, Y: 92, w: 1000, h: 668 };
+  const mp = view(IM.map, M.X, M.Y, M.w, M.h, { inv: 1, z: lerp(1, 1.22, eio(seg(t, 21.3, 24.8))), fx: .56, fy: .56, flash: fl(t, 21.3, 'paper') }); tag('MAP · retrospective', M.X, 78, { id: 't06a' });
+  x.save(); clipR(M); const S = closeP(MAP.slide).map(p => mp(...p)); const k = dk(t, 21.75, 22.5);
+  if (k >= 1) polyFill(S, `rgba(255,74,46,${.18 * seg(t, 22.5, 22.8)})`); polyK(S, k, { w: 2.6, dash: [10, 7] });
+  if (t >= 22.55) { const [lx, ly] = mp(1240, 980); chip('SLIDE ZONE', lx, ly, { s: 24, a: on(t, 22.55, .1), id: 'c06a' }); }
+  x.restore();
+  if (t >= 22.75) { const k2 = on(t, 22.75, .1); x.save(); x.globalAlpha = k2; hair(M.X, 800, M.X + 40, 800, C.acc, 2.5, [8, 5]); x.restore();
+    txt('area that moved in 1963 · drawn on a later map', M.X + 54, 806, { s: 16, f: F.mono, c: C.dim, a: k2 }); }
+  if (t >= 22.45) { const Q = { X: 1100, Y: 92, w: 760, h: 424 }; const mq = view(IM.ai02, Q.X, Q.Y, Q.w, Q.h, { inv: 1, dashed: 1, flash: fl(t, 22.45) });
+    tag('AI · CONCEPTUAL SCHEMATIC', Q.X, 78, { id: 'ai02tag', chip: C.dim });
+    x.save(); clipR(Q); polyK(AI02.slip.map(p => mq(...p)), dk(t, 23.3, 24.15), { w: 3 }); x.restore();
+    if (t >= 24.1) { const [lx, ly] = mq(1700, 1150); chip('ANCIENT SLIP SURFACE', lx, ly, { s: 20, f: F.mono, w: 600, al: 'center', a: on(t, 24.1, .1) }); }
+    txt('SECTION', Q.X + 16, Q.Y + Q.h - 16, { s: 14, f: F.mono, c: C.dim, ls: 3 }); }
+  txt('PLAN', M.X + 16, M.Y + M.h - 16, { s: 14, f: F.mono, c: C.dim, ls: 3 });
+  if (t >= 22.4) { const k3 = on(t, 22.4, .1); txt('PREHISTORIC', 1104, 640, { s: 64, w: 700, a: k3, id: 'r06' }); txt('a slide that had already happened', 1108, 682, { s: 17, f: F.mono, c: C.dim, a: k3 }); cue('click', 22.5, { v: .6 }); }
+}
+function s07(t) { // 24.80–28.90 the block above the slip surface could move again
+  const P = { X: 60, Y: 92, w: 1448, h: 808 };
+  const mp = view(IM.ai02, P.X, P.Y, P.w, P.h, { inv: 1, dashed: 1, flash: fl(t, 24.8, 'paper') });
+  tag('AI · CONCEPTUAL SCHEMATIC', P.X, 78, { id: 'ai02tag', chip: C.dim });
+  const B = AI02.block.map(p => mp(...p)), kb = dk(t, 24.95, 25.5);
+  const nk = eio(seg(t, 27.9, 28.5)), dx = -7 * nk, dy = 5 * nk;
+  x.save(); clipR(P);
+  if (nk > 0) { // the masked block slides a few pixels down-slope, with restraint
+    x.save(); x.beginPath(); B.forEach((p, i) => i ? x.lineTo(p[0] + dx, p[1] + dy) : x.moveTo(p[0] + dx, p[1] + dy)); x.closePath(); x.clip();
+    x.translate(dx, dy); view(IM.ai02, P.X, P.Y, P.w, P.h, { inv: 1, noborder: 1 }); x.restore(); }
+  if (kb > 0) { const Bs = B.map(p => [p[0] + dx, p[1] + dy]); polyFill(Bs, `rgba(255,74,46,${.17 * kb})`); polyK(closeP(Bs), kb, { w: 2 }); }
+  if (t >= 26.7) { const pulse = .65 + .35 * Math.sin((t - 26.7) * 9); polyK(AI02.slip.map(p => mp(...p)), dk(t, 26.7, 27.2), { w: 3.5, dash: [14, 8], off: -(t - 26.7) * 40, a: pulse }); }
+  x.restore();
+  if (t >= 25.45) { const [lx, ly] = mp(1500, 640); chip('ANCIENT SLIDE MASS', lx, ly, { s: 26, al: 'center', a: on(t, 25.45, .1), id: 'c07a' }); cue('click', 25.45, { v: .5 }); }
+  if (t >= 26.75) { const [wx, wy] = mp(1460, 1130); chip('WARNING', wx, wy, { s: 28, c: C.acc, al: 'center', a: on(t, 26.75, .08), id: 'c07b' }); }
+  // right column: a later photo of the slope + the status of the hypothesis
+  if (t >= 25.2) { const Q = { X: 1540, Y: 92, w: 320, h: 215 }; const mq = view(IM.crack60, Q.X, Q.Y, Q.w, Q.h, { flash: fl(t, 25.2) }); tag('PHOTO · 1960', Q.X, 78);
+    const [cx, cy] = mq(228, 138); x.save(); clipR(Q); ring(cx, cy, 60, dk(t, 25.35, 25.85, 'none')); x.restore(); }
+  if (t >= 25.75) { txt('STATUS', 1540, 420, { s: 16, f: F.mono, c: C.dim, ls: 3, a: on(t, 25.75) }); cue('click', 25.75, { v: .6 });
+    txt('DORMANT?', 1540, 486, { s: 48, w: 700, c: t >= 26.7 ? C.dim : C.text, a: on(t, 25.75), id: 'r07a' });
+    const ks = dk(t, 26.7, 27.0, 'scratch'); if (ks > 0) hair(1536, 470, lerp(1536, 1540 + tw('DORMANT?', { s: 48, w: 700 }) + 4, ks), 470, C.acc, 3.5); }
+  if (t >= 26.75) { txt('UNSTABLE', 1540, 566, { s: 48, w: 700, a: on(t, 26.75), id: 'r07b' }); cue('click', 26.75, { v: .8 }); }
+}
+function s08(t) { // 28.90–34.40 four years later → the night
+  if (t < 31.07) {
+    const P = { X: 60, Y: 92, w: 1160, h: 800 };
+    view(IM.lake60a, P.X, P.Y, P.w, P.h, { z: lerp(1, 1.03, seg(t, 28.9, 30.9)), flash: fl(t, 28.9) }); tag('PHOTO · 1960', P.X, 78, { id: 't08a' });
+    const yrs = [1959, 1960, 1961, 1962, 1963]; let yi = 0; for (let i = 0; i < 5; i++) if (t >= 29.15 + i * .16) { yi = i; cue('tick', +(29.15 + i * .16).toFixed(2), { v: .7 }); }
+    if (t >= 29.15) txt(String(yrs[yi]), 1276, 330, { s: 150, w: 700 });
+    if (t >= 29.15) txt('+4 YEARS', 1282, 380, { s: 18, f: F.mono, c: C.dim, ls: 3, a: on(t, 29.85) });
+    if (t >= 30.2) { const Q = { X: 1280, Y: 470, w: 580, h: 401 }; view(IM.lake60b, Q.X, Q.Y, Q.w, Q.h, { flash: fl(t, 30.2) }); tag('PHOTO · 1960', Q.X, Q.Y - 14); }
+    return;
+  }
+  cue('cut', 31.07); flashRect(0, 0, W, 940, (1 - seg(t, 31.07, 31.17)) * .9);
+  txt('OCTOBER', 160, 470, { s: 150, w: 700, a: on(t, 31.07), id: 'd08a' });
+  if (t >= 31.35) { cue('click', 31.35); txt('9', 160 + tw('OCTOBER ', { s: 150, w: 700 }), 470, { s: 150, w: 700, a: on(t, 31.35), id: 'd08b' }); }
+  if (t >= 31.88) { cue('click', 31.88); txt('1963', 160, 640, { s: 150, w: 700, a: on(t, 31.88), id: 'd08c' }); }
+  for (let s = 31.5; s < 33.2; s += .5) if (t >= s) cue('tick', +s.toFixed(2), { v: .9 });
+  if (t >= 32.88) { cue('click', 32.88, { v: .4 }); const a = on(t, 32.88); x.save(); x.globalAlpha = a; x.fillStyle = C.acc; x.beginPath(); x.arc(176, 762, 11, 0, 7); x.fill(); x.restore();
+    txt('22:39 CET', 206, 784, { s: 64, f: F.mono, w: 600, a, id: 'd08d' }); txt('NIGHT · LOCAL TIME', 208, 828, { s: 16, f: F.mono, c: C.dim, ls: 3, a }); }
+}
+const SL63 = [[240,215],[330,205],[450,205],[560,210],[680,200],[800,205],[800,395],[700,390],[620,395],[520,395],[470,385],[420,345],[350,330],[290,300],[250,260]];
+function s09(t) { // 34.40–38.50 volume
+  const P = { X: 60, Y: 92, w: 1160, h: 797 };
+  const mp = view(IM.slide63, P.X, P.Y, P.w, P.h, { z: lerp(1, 1.04, seg(t, 35.0, 38.5)), fx: .6, fy: .5, flash: fl(t, 35.0, 'impact') }); tag('PHOTO · after 1963', P.X, 78, { id: 't09a' });
+  x.save(); clipR(P); const S = closeP(SL63).map(p => mp(...p)), k = dk(t, 35.3, 36.1);
+  if (k >= 1) polyFill(S, `rgba(255,74,46,${.15 * seg(t, 36.1, 36.4)})`); polyK(S, k, { w: 2.6 });
+  if (t >= 35.9) { const [lx, ly] = mp(560, 150); chip('SLIDE MASS', lx, ly, { s: 24, al: 'center', a: on(t, 35.9, .1), id: 'c09a' }); }
+  x.restore();
+  if (t >= 35.2) { const v = count(t, 35.2, 36.3, 0, 260); txt('≈ ' + v, 1262, 320, { s: 160, w: 700, a: on(t, 35.2), id: t >= 36.3 ? 'r09a' : null }); }
+  if (t >= 35.25) { txt('MILLION m³', 1268, 396, { s: 56, w: 700, a: on(t, 35.25), id: 'r09b' }); txt('OF ROCK · ESTIMATE', 1270, 432, { s: 17, f: F.mono, c: C.dim, ls: 3, a: on(t, 35.4) }); }
+  if (t >= 37.2) { const Q = { X: 1290, Y: 520, w: 570, h: 318 }; view(IM.ai03, Q.X, Q.Y, Q.w, Q.h, { ai: 1, dashed: 1, flash: fl(t, 37.2) }); tag('AI RECONSTRUCTION', Q.X, Q.Y - 14, { id: 'ai03tag', chip: C.dim }); }
+}
+function s10(t) { // 38.50–41.60 under a minute
+  const P = { X: 60, Y: 92, w: 1448, h: 808 };
+  const mp = view(IM.ai03, P.X, P.Y, P.w, P.h, { ai: 1, dashed: 1, flash: fl(t, 38.5, 'whoosh') }); tag('AI RECONSTRUCTION', P.X, 78, { id: 'ai03tag', chip: C.dim });
+  const A = [[[1560,320],[1380,460],[1120,610]], [[1760,430],[1560,590],[1300,760]], [[1320,250],[1080,410],[820,560]]];
+  x.save(); clipR(P); A.forEach((a, i) => polyK(a.map(p => mp(...p)), dk(t, 38.6 + i * .15, 39.45 + i * .15, i ? 'none' : 'rumble'), { w: 4, head: 1, hs: 20 })); x.restore();
+  if (t >= 39.1) { const [lx, ly] = mp(1420, 300); chip('SCHEMATIC PATH', lx, ly, { s: 20, f: F.mono, w: 600, a: on(t, 39.1, .1), id: 'c10a' }); }
+  const [dx, dy] = mp(1760, 1060); ring(dx, dy, 120, dk(t, 39.45, 39.95), 'DAM', -1, 'c10b');
+  if (t >= 39.1) { const Q = { X: 1540, Y: 92, w: 320, h: 223 }; view(IM.dam63, Q.X, Q.Y, Q.w, Q.h, { flash: fl(t, 39.1) }); tag('PHOTO · after', Q.X, 78); }
+  if (t >= 39.8) { cue('click', 39.8); txt('< 60 s', 1540, 470, { s: 96, w: 700, a: on(t, 39.8), id: 'r10' });
+    const X0 = 1540, X1 = 1860, Y = 520, kb = eo(seg(t, 40.3, 41.4)); hair(X0, Y, X1, Y, C.line, 2); fill(X0, Y - 4, (X1 - X0) * kb, 8, C.acc);
+    [0, 30, 60].forEach(s => { const xx = lerp(X0, X1, s / 60); hair(xx, Y - 10, xx, Y + 10, C.dim); txt(s + (s === 60 ? ' s' : ''), xx, Y + 34, { s: 15, f: F.mono, c: C.dim, al: s === 0 ? 'left' : s === 60 ? 'right' : 'center' }); });
+    txt('DURATION OF THE SLIDE', 1540, 600, { s: 15, f: F.mono, c: C.dim, ls: 2, a: on(t, 39.9) }); }
+}
+const AI04 = { front: x0 => [[x0, 470], [x0 - 30, 560], [x0 - 10, 650], [x0 - 40, 730]], over: [[1260,560],[1040,480],[860,440],[730,470],[660,620],[640,860]] };
+function s11(t) { // 41.60–44.50 the wave: where the water went
+  const M = { X: 60, Y: 92, w: 1100, h: 735 };
+  const mp = view(IM.map, M.X, M.Y, M.w, M.h, { inv: 1, z: 1.12, fx: .5, fy: .52, flash: fl(t, 41.6, 'paper') }); tag('MAP · retrospective', M.X, 78, { id: 't11a' });
+  x.save(); clipR(M); polyFill(MAP.slide.map(p => mp(...p)), 'rgba(255,74,46,0.28)'); polyK(closeP(MAP.slide).map(p => mp(...p)), 1, { w: 1.5, a: .8 });
+  const routes = [[MAP.west, 41.95], [MAP.north, 42.35], [MAP.east, 42.55]];
+  routes.forEach(([R, a], i) => { const k = dk(t, a, a + .9, i ? 'none' : 'water'); polyK(R.map(p => mp(...p)), k, { w: 4, head: 1, hs: 18 }); });
+  const [dx, dy] = mp(...MAP.dam); ring(dx, dy, 30, dk(t, 42.4, 42.85, 'none'), 'DAM', -1, 'c11a', -1);
+  x.restore();
+  if (t >= 41.75) { const Q = { X: 1200, Y: 92, w: 660, h: 368 }; const mq = view(IM.ai04, Q.X, Q.Y, Q.w, Q.h, { ai: 1, dashed: 1, flash: fl(t, 41.75) });
+    tag('AI · CONCEPTUAL SCHEMATIC', Q.X, 78, { id: 'ai04tag', chip: C.dim });
+    const fx = lerp(1450, 930, eio(seg(t, 42.2, 44.4))); x.save(); clipR(Q); polyK(AI04.front(fx).map(p => mq(...p)), 1, { w: 3 }); const [lx, ly] = mq(fx, 455); x.restore();
+    if (t >= 42.2) chip('WAVE FRONT', lx, ly - 4, { s: 15, f: F.mono, w: 600, al: 'center', a: on(t, 42.2, .1) });
+    txt('illustration · not a measured run-up', Q.X, Q.Y + Q.h + 30, { s: 15, f: F.mono, c: C.dim, a: on(t, 41.85) }); }
+  const rows = [['WEST', 'over the dam', 41.7], ['NORTH', 'towards Casso', 41.9], ['EAST', 'up the valley', 42.1]];
+  rows.forEach(([a, b, at], i) => { if (t < at + .3) return; const Y = 600 + i * 62; cue('click', at + .3, { v: .4 });
+    polyK([[1200, Y - 9], [1250, Y - 9]], 1, { w: 3, head: 1, hs: 12, a: on(t, at + .3) }); txt(a, 1270, Y, { s: 28, w: 700, a: on(t, at + .3), id: 'w11' + i }); txt(b, 1270 + tw(a + '  ', { s: 28, w: 700 }), Y, { s: 18, f: F.mono, c: C.dim, a: on(t, at + .3) }); });
+}
+function s12(t) { // 44.50–48.30 over the top of the dam → the town below
+  const P = { X: 60, Y: 92, w: 1000, h: 808 };
+  const mp = view(IM.ai04, P.X, P.Y, P.w, P.h, { ai: 1, dashed: 1, z: lerp(1.08, 1.14, seg(t, 44.5, 48.3)), fx: .36, fy: .5, flash: fl(t, 44.5) });
+  tag('AI · CONCEPTUAL SCHEMATIC', P.X, 78, { id: 'ai04tag', chip: C.dim });
+  x.save(); clipR(P); polyK(AI04.over.map(p => mp(...p)), dk(t, 44.55, 45.25, 'water'), { w: 4.5, head: 1, hs: 22 }); x.restore();
+  const [rx, ry] = mp(800, 720); ring(rx, ry, 170, dk(t, 45.2, 45.7), 'DAM INTACT', 1, 'c12a');
+  if (t >= 45.45) { const Q = { X: 1100, Y: 92, w: 760, h: 380 }; const mq = view(IM.longB, Q.X, Q.Y, Q.w, Q.h, { fy: .55, flash: fl(t, 45.45) }); tag('PHOTO · before', Q.X, 78, { id: 't12a' });
+    const [cx, cy] = mq(470, 320); x.save(); clipR(Q); ring(cx, cy, 90, dk(t, 45.6, 46.05, 'none')); x.restore(); chip('LONGARONE', Q.X + Q.w - 20, Q.Y + Q.h - 24, { s: 24, al: 'right', a: on(t, 45.6, .1), id: 'c12b' }); }
+  if (t >= 46.0) { const Q = { X: 1100, Y: 520, w: 760, h: 380 }; const mq = view(IM.longA, Q.X, Q.Y, Q.w, Q.h, { fy: .5, flash: fl(t, 46.0) }); tag('PHOTO · 1963', Q.X, Q.Y - 14, { id: 't12b' });
+    const [cx, cy] = mq(330, 370); x.save(); clipR(Q); ring(cx, cy, 110, dk(t, 46.45, 46.95, 'none')); x.restore(); chip('AFTER', Q.X + Q.w - 20, Q.Y + Q.h - 24, { s: 24, al: 'right', a: on(t, 46.15, .1), id: 'c12c' }); }
+}
+function s13(t) { // 48.30–51.60 the cost: one ring per person, no sound effects
+  const P = { X: 60, Y: 92, w: 620, h: 624 };
+  view(IM.pirago, P.X, P.Y, P.w, P.h, { soft: 1 }); tag('PHOTO · Pirago, 1963', P.X, 78, { id: 't13a' });
+  const N = 2000, cols = 80, sp = 13.6, X0 = 760, Y0 = 118, kd = seg(t, 48.6, 50.2), n = Math.floor(N * kd);
+  x.save(); x.strokeStyle = C.dim; x.lineWidth = 1.2; x.beginPath();
+  for (let i = 0; i < n; i++) { const cx = X0 + (i % cols) * sp, cy = Y0 + Math.floor(i / cols) * sp; x.moveTo(cx + 3.6, cy); x.arc(cx, cy, 3.6, 0, Math.PI * 2); } x.stroke(); x.restore();
+  txt('ALMOST 2,000', 754, 610, { s: 120, w: 700, a: on(t, 49.08, .1), id: 'r13a' });
+  txt('KILLED', 760, 690, { s: 56, w: 700, c: C.text, a: on(t, 49.5, .1), id: 'r13b' });
+  txt('one ring ≈ one person · the exact toll varies by source', 762, 740, { s: 16, f: F.mono, c: C.dim, a: on(t, 49.6, .1) });
+}
+function s14(t) { // 51.60–56.40 the dam survived — and stands today
+  const P = { X: 60, Y: 92, w: 900, h: 665 };
+  const mp = view(IM.damAfter, P.X, P.Y, P.w, P.h, { flash: fl(t, 51.6) }); tag('PHOTO · after 9 Oct 1963', P.X, 78, { id: 't14a' });
+  const [rx, ry] = mp(450, 330); x.save(); clipR(P); ring(rx, ry, 260, dk(t, 52.6, 53.1)); x.restore();
+  if (t >= 52.0) { cue('click', 52.0); txt('1963', 1000, 300, { s: 96, w: 700, a: on(t, 52.0), id: 'r14a' }); }
+  badge(1020, 362, t, 52.95); if (t >= 52.95) txt('STANDING', 1052, 372, { s: 28, w: 700, a: on(t, 52.95), id: 'r14b' });
+  if (t >= 53.4) txt('little damage', 1002, 412, { s: 17, f: F.mono, c: C.dim, a: on(t, 53.4) });
+  if (t >= 54.25) { const Q = { X: 1330, Y: 92, w: 530, h: 795 }; view(IM.damModern, Q.X, Q.Y, Q.w, Q.h, { z: lerp(1, 1.03, seg(t, 54.25, 56.4)), flash: fl(t, 54.25) }); tag('PHOTO · now', Q.X, 78, { id: 't14b' });
+    txt('TODAY', 1000, 640, { s: 96, w: 700, a: on(t, 54.45), id: 'r14c' }); }
+  badge(1020, 702, t, 55.4);
+  if (t >= 54.6) { const k = dk(t, 54.6, 55.0, 'none'); hair(1000, 470, 1000, lerp(470, 560, k), C.line, 1.5, [3, 5]); }
+}
+const PANO = [[177,431],[300,372],[450,320],[600,284],[760,259]];
+function s15(t) { // 56.40–62.10 precision: three cards, a precision line, the name
+  const A = { X: 60, Y: 92, w: 400, h: 586 }; view(IM.cartolina, A.X, A.Y, A.w, A.h, { flash: fl(t, 56.45) }); tag('POSTCARD', A.X, 78, { id: 't15a' });
+  if (t >= 57.75) { cue('click', 57.75, { v: 1.2 }); txt('VAJONT', 54, 812, { s: 132, f: F.mono, w: 600, ls: 22, a: on(t, 57.75), id: 'r15a' }); flashRect(54, 690, 820, 140, (1 - seg(t, 57.75, 57.85)) * .7); }
+  if (t >= 58.4) txt('DOUBLE-CURVATURE ARCH DAM', 62, 860, { s: 18, f: F.mono, c: C.dim, ls: 4, a: on(t, 58.4), id: 'r15b' });
+  if (t >= 58.6) { const B = { X: 500, Y: 92, w: 700, h: 498 }; view(IM.cabin, B.X, B.Y, B.w, B.h, { z: 1.55, fx: .7, fy: .52, flash: fl(t, 58.6) }); tag('PHOTO · detail', B.X, 78); }
+  if (t >= 59.0) { // plan of the arch (schematic), drawn stroke by stroke
+    const cx = 1540, cy = 1130, R0 = 420, R1 = 452, a0 = -2.25, a1 = -.89, k1 = dk(t, 59.0, 59.9), k2 = dk(t, 59.3, 60.2, 'none');
+    x.save(); x.strokeStyle = C.text; x.lineWidth = 1.4; x.beginPath(); x.arc(cx, cy, R0, a0, lerp(a0, a1, k1)); x.stroke(); x.beginPath(); x.arc(cx, cy, R1, a0, lerp(a0, a1, k2)); x.stroke(); x.restore();
+    if (k2 >= 1) { const p = a => [cx + Math.cos(a) * R1, cy + Math.sin(a) * R1], q = a => [cx + Math.cos(a) * R0, cy + Math.sin(a) * R0]; hair(...p(a0), ...q(a0), C.text, 1.4); hair(...p(a1), ...q(a1), C.text, 1.4);
+      txt('ARCH · PLAN · SCHEMATIC', 1250, 880, { s: 14, f: F.mono, c: C.dim, ls: 2 }); }
+    const kr = dk(t, 60.65, 61.5, 'tickline'); if (kr > 0) { x.save(); x.strokeStyle = C.acc; x.lineWidth = 1.5; x.beginPath(); x.arc(cx, cy, R1 + 22, a0, lerp(a0, a1, kr)); x.stroke();
+      for (let a = a0; a <= lerp(a0, a1, kr) + 1e-6; a += (a1 - a0) / 24) { const r1 = R1 + 16, r2 = R1 + 28; x.beginPath(); x.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); x.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2); x.stroke(); } x.restore(); } }
+  if (t >= 59.6) { const Q = { X: 1240, Y: 92, w: 620, h: 426 }; const mq = view(IM.pano60, Q.X, Q.Y, Q.w, Q.h, { flash: fl(t, 59.6) }); tag('PHOTO · 1960', Q.X, 78, { id: 't15c' });
+    const kp = dk(t, 60.65, 61.5, 'none'); x.save(); clipR(Q); const pts = PANO.map(p => mq(p[0], p[1] - 14)); polyK(pts, kp, { w: 1.8 });
+    for (let i = 0; i <= 20; i++) { if (i / 20 > kp) break; const f = i / 20 * (pts.length - 1), j = Math.min(pts.length - 2, Math.floor(f)), u = f - j, px = lerp(pts[j][0], pts[j + 1][0], u), py = lerp(pts[j][1], pts[j + 1][1], u); hair(px, py - 7, px, py + 1, C.acc, 1.5); }
+    x.restore(); }
+}
+function s16(t) { // 62.10–67.77 evidence map → verdict
+  const dimK = 1 - .82 * eio(seg(t, 64.55, 64.85));
+  x.save(); x.globalAlpha = dimK;
+  const M = { X: 580, Y: 92, w: 760, h: 508 };
+  const mp = view(IM.map, M.X, M.Y, M.w, M.h, { inv: 1, z: 1.1, fx: .48, fy: .52, flash: fl(t, 62.1, 'paper') }); tag('MAP · retrospective', M.X, 78);
+  x.save(); clipR(M); polyFill(MAP.slide.map(p => mp(...p)), 'rgba(255,74,46,0.3)'); x.restore();
+  const panels = [
+    { k: 'slide63', at: 62.2, R: { X: 60, Y: 92, w: 470, h: 323 }, tag: 'PHOTO · slide, 1963', to: MAP.slideC, from: [530, 385] },
+    { k: 'aerial63', at: 62.45, R: { X: 60, Y: 470, w: 470, h: 345 }, tag: 'PHOTO · valley, 1963', to: MAP.longarone, from: [530, 640] },
+    { k: 'damAfter', at: 62.7, R: { X: 1390, Y: 92, w: 470, h: 347 }, tag: 'PHOTO · dam, 1963', to: MAP.dam, from: [1390, 260] } ];
+  panels.forEach((p, i) => { if (t < p.at) return; view(IM[p.k], p.R.X, p.R.Y, p.R.w, p.R.h, { flash: fl(t, p.at) }); tag(p.tag, p.R.X, p.R.Y - 14);
+    const kl = dk(t, 63.05 + i * .2, 63.65 + i * .2, i ? 'none' : 'pencil'); if (kl > 0) { const e = mp(...p.to); polyK([p.from, e], kl, { w: 2, dash: [7, 5] }); if (kl >= 1) badgeDot(...e); } });
+  // mini timeline, broken axis (years → the night → today)
+  if (t >= 62.9) { const Y = 760, k = dk(t, 62.9, 63.4, 'none'); cue('click', 62.9, { v: .4 });
+    const pts = [[620, '1959', 'survey'], [800, '1960', 'dam complete'], [1060, '9 OCT 1963', '22:39'], [1300, 'TODAY', 'standing']];
+    hair(600, Y, lerp(600, 940, k), Y, C.dim, 1.5); if (k > .6) { hair(960, Y, lerp(960, 1340, seg(k, .6, 1)), Y, C.dim, 1.5); hair(944, Y + 8, 952, Y - 8, C.dim, 1.5); hair(952, Y + 8, 960, Y - 8, C.dim, 1.5); }
+    pts.forEach(([X, a, b], i) => { if (k < (i + 1) / 4) return; const red = i === 2; hair(X, Y - 10, X, Y + 10, red ? C.acc : C.dim, red ? 3 : 1.5);
+      txt(a, X, Y - 22, { s: red ? 20 : 17, f: F.mono, w: 600, c: red ? C.acc : C.text, al: 'center' }); txt(b, X, Y + 34, { s: 14, f: F.mono, c: C.dim, al: 'center' }); }); }
+  const sums = [['≈ 260 M m³', 'rock in the slide'], ['< 60 s', 'duration of the slide'], ['≈ 2,000', 'people killed']];
+  sums.forEach(([a, b], i) => { const at = 63.3 + i * .18; if (t < at) return; cue('click', at, { v: .35 }); const Y = 540 + i * 110;
+    hair(1390, Y - 52, 1860, Y - 52, C.line); txt(a, 1390, Y, { s: 48, w: 700, a: on(t, at) }); txt(b, 1392, Y + 30, { s: 15, f: F.mono, c: C.dim, ls: 2, a: on(t, at) }); });
+  badge(1420, 122, t, 63.95); if (t >= 63.95) chip('STANDING', 1450, 132, { s: 20, a: on(t, 63.95) });
+  badge(90, 122, t, 64.1, 1); if (t >= 64.1) chip('FAILED', 120, 132, { s: 20, a: on(t, 64.1) });
+  badge(90, 500, t, 64.25, 1); if (t >= 64.25) chip('DESTROYED', 120, 510, { s: 20, a: on(t, 64.25) });
+  x.restore();
+  // verdict (editorial line, not a quotation)
+  if (t >= 64.7) { cue('verdict', 64.7); fill(120, 330, 8, 330, C.acc);
+    txt('THE DAM SURVIVED.', 170, 450, { s: 112, w: 700, a: on(t, 64.7, .06), id: 'v1' }); }
+  if (t >= 65.0) { cue('verdict2', 65.0); txt('THE MOUNTAIN FAILED.', 170, 610, { s: 112, w: 700, a: on(t, 65.0, .06), id: 'v2' }); }
+  if (t >= 64.7) flashRect(0, 0, W, 940, (1 - seg(t, 64.7, 64.8)) * .5);
+}
+
+// ── subtitles: English only, one line, at the style's upper subtitle line ──
+const SUBY = 1000, SUBS = 34, NOSUBS = /nosubs=1/.test(location.search);   // ?nosubs=1 for the poster
+function subs(t) { for (const [a, b, s] of FILM.subs) if (t >= a && t < b) { x.save(); x.shadowColor = 'rgba(0,0,0,.95)'; x.shadowBlur = 10; txt(s, W / 2, SUBY, { s: SUBS, w: 700, al: 'center' }); x.restore(); } }
+const SCN = { s01, s02, s03, s04, s05, s06, s07, s08, s09, s10, s11, s12, s13, s14, s15, s16 };
+window.render = function (t) {
+  FR = Math.round(t * FPS); x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; fill(0, 0, W, H, C.bg);
+  let cur = SECS[SECS.length - 1]; for (const s of SECS) if (t >= s[1] && t < s[2]) { cur = s; break; }
+  SCN[cur[0]](t); if (!NOSUBS) subs(t);
+};
+window.TEXTS = function (t) { REC = []; window.render(t); const r = REC; REC = null; return r; };
+window.SUBCHECK = function () { const bad = []; for (const [a, b, s] of FILM.subs) { const w = tw(s, { s: SUBS, w: 700 }); if (w > 1500) bad.push({ a, s, w: Math.round(w) }); } return bad; };
+Object.defineProperty(window, 'EV', { get() { // events pass: draw every frame once and collect the cues the picture used
+  CUES = new Map(); for (let f = 0; f < FILM.frames; f++) window.render(f / FPS); const ev = [...CUES.values()].filter(e => e.type !== 'none').sort((a, b) => a.t - b.t); CUES = null; return ev; } });
+boot();
+</script></body></html>
