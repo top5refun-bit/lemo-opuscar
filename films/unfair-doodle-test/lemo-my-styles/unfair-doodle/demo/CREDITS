@@ -1,0 +1,24 @@
+The Unfair Advantages Of Your Birth Order — Unfair Doodle test cut · asset sources & licences
+
+Narration   The user's own recording (vo_test.mp3, ElevenLabs voice "Liam"), used as supplied; three silences inserted.
+Robot line  "Initiating sibling scan." — Kokoro TTS v1.0 (kokoro-onnx, Apache-2.0), voice am_michael, processed in code
+            (ring modulator, bit-crusher, comb).
+Music       Original score written in code (mix.py), played with samples:
+            Samples (CC0): FreePats project (freepats.zenvoid.org) — ukulele; VS Chamber Orchestra: Community Edition
+            (Versilian Studios) — pizzicato strings and bass, bassoon, timpani, bass drum, snare, crash, tambourine;
+            Versilian Community Sample Library (Versilian Studios) — claps, shaker, woodblock, glockenspiel, xylophone,
+            marimba, suspended cymbal.
+Sound FX    Synthesized in code (mix.py + the library's core/audio/sfx.py) and from the CC0 samples above.
+Fonts       Permanent Marker (Font Diner) — Apache License 2.0
+            Luckiest Guy (Astigmatic) — Apache License 2.0
+            Patrick Hand (Patrick Wagesreiter) — SIL Open Font License 1.1
+            Jost (Owen Earl) — SIL Open Font License 1.1 (only for the ?base=1 comparison view, not in the film)
+            Files from github.com/google/fonts; licence texts in fonts/.
+Artwork     Every character, prop and background is drawn procedurally in code (engine.js, toon.js, film.js, sheet.js).
+            No photos, logos or likenesses of real people or brands.
+Code        Techniques adapted from Lemo-Opuscar (MIT): the screen-space outline and boil approach from
+            styles/scifi-toon/demo/toon.js, the figure and pop-in ideas from styles/stick-explainer and styles/midcentury-toon;
+            rendering, sampler, foley helpers and loudness tools from the library's core/.
+Tools       ffmpeg 9 (imageio-ffmpeg build) for muxing and loudness; headless Chromium for rendering.
+Style       Inspired by adult-swim-era sitcom cartoons and comedic ranking explainers (grammar only). No characters, names,
+            catchphrases, layouts or graphics from any existing show or channel are used.

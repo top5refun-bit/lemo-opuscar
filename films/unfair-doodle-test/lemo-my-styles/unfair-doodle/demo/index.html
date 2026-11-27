@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Unfair Doodle — test cut</title>
+<style>
+@font-face{font-family:"Permanent Marker";src:url(fonts/PermanentMarker-Regular.ttf) format('truetype')}
+@font-face{font-family:"Patrick Hand";src:url(fonts/PatrickHand-Regular.ttf) format('truetype')}
+@font-face{font-family:"Luckiest Guy";src:url(fonts/LuckiestGuy-Regular.ttf) format('truetype')}
+@font-face{font-family:"Jost";src:url(fonts/Jost.ttf) format('truetype');font-weight:100 900}
+html,body{margin:0;background:#F7F3EA;overflow:hidden}canvas{display:block}
+</style></head><body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script src="engine.js"></script>
+<script src="toon.js"></script>
+<script src="film.js"></script>
+<script src="sheet.js"></script>
+<script>
+(async () => {
+  const fams = BASE ? ['600 40px Jost', '500 40px Jost'] : ['40px "Permanent Marker"', '40px "Patrick Hand"', '40px "Luckiest Guy"'];
+  await Promise.all(fams.map(f => document.fonts.load(f)));
+  try { ENV = await (await fetch('voice/env.json')).json(); } catch (e) { ENV = null; }
+  window.render(+(QS.get('t') || 0));
+  window.READY = true;
+})();
+</script>
+</body></html>

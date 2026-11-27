@@ -1,0 +1,16 @@
+{
+ "slug": "unfair-doodle",
+ "en": "Unfair Doodle",
+ "cn": "不公平涂鸦",
+ "based_on": "scifi-toon",
+ "borrows": [
+  "midcentury-toon",
+  "sketchnote",
+  "whiteboard"
+ ],
+ "fps": 30,
+ "library_version": "ee7b29d",
+ "created": "2026-11-27",
+ "line": "Comedic science rankings as a thick-outline sitcom cartoon on a cream void: filled cartoon people, one coral T-shirt for the subject, a suited ivory die as the star host, slams, zoom punches, colour beats and two recurring stings.",
+ "line_cn": "厚描边情景喜剧卡通风的搞笑科学排行榜：奶油色空白背景，填色卡通人物，主角穿珊瑚色 T 恤，西装骰子主持人担纲，砸字、冲镜、整屏色块和两段固定小片头。"
+}
